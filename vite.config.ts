@@ -4,6 +4,7 @@ import { resolve } from 'path';
 export default defineConfig({
   build: {
     target: 'esnext',
+    assetsInlineLimit: 0, // Prevent WASM from being inlined as data URIs
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
