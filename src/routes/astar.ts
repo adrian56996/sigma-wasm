@@ -1,26 +1,35 @@
 import type { Layer, WasmAstar, WasmModuleAstar } from '../types';
+import { loadWasmModule, validateWasmModule } from '../wasm/loader';
+import { WasmLoadError, WasmInitError } from '../wasm/types';
 
 // Lazy WASM import - only load when init() is called
-// Using a getter function to defer the import until actually needed
-let wasmInitFn: (() => Promise<unknown>) | null = null;
-const getInitWasm = async (): Promise<unknown> => {
-  if (!wasmInitFn) {
-    // Import only when first called
-    const wasmModule = await import('../../pkg/wasm_astar/wasm_astar.js');
-    wasmInitFn = wasmModule.default;
-  }
-  return wasmInitFn();
-};
+let wasmModuleExports: {
+  default: () => Promise<unknown>;
+  wasm_init: (debug: number, renderIntervalMs: number, windowWidth: number, windowHeight: number) => void;
+  tick: (elapsedTime: number) => void;
+  key_down: (keyCode: number) => void;
+  key_up: (keyCode: number) => void;
+  mouse_move: (x: number, y: number) => void;
+} | null = null;
 
-// Type for wasm-bindgen exports
-interface WasmBindgenExports {
-  memory?: WebAssembly.Memory;
-  wasm_init?: (debug: number, renderIntervalMs: number, windowWidth: number, windowHeight: number) => void;
-  tick?: (elapsedTime: number) => void;
-  key_down?: (keyCode: number) => void;
-  key_up?: (keyCode: number) => void;
-  mouse_move?: (x: number, y: number) => void;
-}
+const getInitWasm = async (): Promise<unknown> => {
+  if (!wasmModuleExports) {
+    // Import only when first called - get both init and exported functions
+    const module = await import('../../pkg/wasm_astar/wasm_astar.js');
+    wasmModuleExports = {
+      default: module.default,
+      wasm_init: module.wasm_init,
+      tick: module.tick,
+      key_down: module.key_down,
+      key_up: module.key_up,
+      mouse_move: module.mouse_move,
+    };
+  }
+  if (!wasmModuleExports) {
+    throw new Error('Failed to load WASM module exports');
+  }
+  return wasmModuleExports.default();
+};
 
 const getLayerWrapper = (): HTMLElement => {
   const element = document.getElementById('layer_wrapper');
@@ -39,7 +48,75 @@ const WASM_ASTAR: WasmAstar = {
   layerWrapperEl: null,
 };
 
+function validateAstarModule(exports: unknown): WasmModuleAstar | null {
+  if (!validateWasmModule(exports)) {
+    return null;
+  }
+  
+  if (typeof exports !== 'object' || exports === null) {
+    return null;
+  }
+  
+  // Check for required exports and provide detailed error info
+  const getProperty = (obj: object, key: string): unknown => {
+    const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+    return descriptor ? descriptor.value : undefined;
+  };
+  
+  const exportKeys = Object.keys(exports);
+  const missingExports: string[] = [];
+  
+  // Check for required exports
+  const memoryValue = getProperty(exports, 'memory');
+  if (!memoryValue || !(memoryValue instanceof WebAssembly.Memory)) {
+    missingExports.push('memory (WebAssembly.Memory)');
+  }
+  if (!('wasm_init' in exports)) {
+    missingExports.push('wasm_init');
+  }
+  if (!('tick' in exports)) {
+    missingExports.push('tick');
+  }
+  if (!('key_down' in exports)) {
+    missingExports.push('key_down');
+  }
+  if (!('key_up' in exports)) {
+    missingExports.push('key_up');
+  }
+  if (!('mouse_move' in exports)) {
+    missingExports.push('mouse_move');
+  }
+  
+  if (missingExports.length > 0) {
+    // Throw error with details for debugging
+    throw new Error(`WASM module missing required exports: ${missingExports.join(', ')}. Available exports: ${exportKeys.join(', ')}`);
+  }
+  
+  // At this point we know memory exists and is WebAssembly.Memory
+  const memory = memoryValue;
+  if (!(memory instanceof WebAssembly.Memory)) {
+    return null;
+  }
+  
+  // Construct module object from exports using type narrowing
+  if (!wasmModuleExports) {
+    return null;
+  }
+  
+  return {
+    memory,
+    wasm_init: wasmModuleExports.wasm_init,
+    tick: wasmModuleExports.tick,
+    key_down: wasmModuleExports.key_down,
+    key_up: wasmModuleExports.key_up,
+    mouse_move: wasmModuleExports.mouse_move,
+  };
+}
+
 export const init = async (): Promise<void> => {
+  // Get error element for displaying errors
+  const errorEl = document.getElementById('error');
+  
   // Get layer wrapper element (lazy initialization - only when init is called)
   WASM_ASTAR.layerWrapperEl = getLayerWrapper();
   
@@ -65,38 +142,16 @@ export const init = async (): Promise<void> => {
   globalObj.js_draw_fps = (layerId: number, fps: number): void => wasmImports.js_draw_fps(layerId, fps);
   globalObj.js_path_count = (layerId: number, count: number): void => wasmImports.js_path_count(layerId, count);
   
-  // Initialize wasm-bindgen (lazy load)
-  const initResult = await getInitWasm();
-  
-  // Type guard to check if result has expected structure
-  const wasmModuleExports: WasmBindgenExports = 
-    typeof initResult === 'object' && initResult !== null
-      ? initResult
-      : {};
-  
-  // Type-safe assignment
-  if (
-    wasmModuleExports.memory &&
-    wasmModuleExports.wasm_init &&
-    wasmModuleExports.tick &&
-    wasmModuleExports.key_down &&
-    wasmModuleExports.key_up &&
-    wasmModuleExports.mouse_move &&
-    wasmModuleExports.memory instanceof WebAssembly.Memory &&
-    typeof wasmModuleExports.wasm_init === 'function' &&
-    typeof wasmModuleExports.tick === 'function' &&
-    typeof wasmModuleExports.key_down === 'function' &&
-    typeof wasmModuleExports.key_up === 'function' &&
-    typeof wasmModuleExports.mouse_move === 'function'
-  ) {
-    const wasmModule: WasmModuleAstar = {
-      memory: wasmModuleExports.memory,
-      wasm_init: wasmModuleExports.wasm_init,
-      tick: wasmModuleExports.tick,
-      key_down: wasmModuleExports.key_down,
-      key_up: wasmModuleExports.key_up,
-      mouse_move: wasmModuleExports.mouse_move,
-    };
+  // Initialize WASM module using loadWasmModule helper
+  try {
+    const wasmModule = await loadWasmModule<WasmModuleAstar>(
+      getInitWasm,
+      validateAstarModule
+    );
+    
+    if (!wasmModule) {
+      throw new WasmInitError('WASM module failed validation');
+    }
     
     WASM_ASTAR.wasmModule = wasmModule;
     
@@ -106,8 +161,20 @@ export const init = async (): Promise<void> => {
       window.innerWidth,
       window.innerHeight
     );
-  } else {
-    throw new Error('WASM module does not have expected exports');
+  } catch (error) {
+    // Show detailed error
+    if (errorEl) {
+      if (error instanceof WasmLoadError) {
+        errorEl.textContent = `Failed to load WASM module: ${error.message}`;
+      } else if (error instanceof WasmInitError) {
+        errorEl.textContent = `WASM module initialization failed: ${error.message}`;
+      } else if (error instanceof Error) {
+        errorEl.textContent = `Error: ${error.message}`;
+      } else {
+        errorEl.textContent = 'Unknown error loading WASM module';
+      }
+    }
+    throw error;
   }
   
   const layerWrapperEl = WASM_ASTAR.layerWrapperEl;
