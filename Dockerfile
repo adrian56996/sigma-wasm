@@ -134,6 +134,39 @@ COPY public ./public
 # WASM is already built in stage 1, so just run vite build (skip build:wasm)
 RUN npx vite build
 
+# Manually copy public directory to dist/ as fallback
+# Vite's default public directory copying may not work with rollupOptions.input
+# This ensures icons and other public assets are always present
+RUN if [ -d "public" ] && [ -d "dist" ]; then \
+      echo "Copying public/ directory to dist/ as fallback..." && \
+      cp -r public/* dist/ && \
+      echo "✓ Public assets copied to dist/"; \
+    else \
+      echo "Warning: public/ or dist/ directory not found"; \
+    fi
+
+# Verify public assets were copied to dist/ (icons, manifest.json, etc.)
+# This catches issues before copying to runtime stage
+RUN echo "Verifying public assets in dist/..." && \
+    if [ ! -d "dist/icons" ]; then \
+      echo "ERROR: dist/icons/ directory not found" >&2; \
+      exit 1; \
+    fi && \
+    if [ ! -f "dist/icons/icon-144x144.png" ]; then \
+      echo "ERROR: dist/icons/icon-144x144.png not found" >&2; \
+      exit 1; \
+    fi && \
+    if [ ! -f "dist/manifest.json" ]; then \
+      echo "ERROR: dist/manifest.json not found" >&2; \
+      exit 1; \
+    fi && \
+    icon_count=$(find dist/icons -type f -name "*.png" | wc -l) && \
+    if [ "$icon_count" -lt 10 ]; then \
+      echo "ERROR: Expected at least 10 icon files, found $icon_count" >&2; \
+      exit 1; \
+    fi && \
+    echo "✓ All public assets verified successfully (found $icon_count icon files)"
+
 # Stage 3: Runtime (nginx for static files)
 FROM nginx:alpine AS runtime
 

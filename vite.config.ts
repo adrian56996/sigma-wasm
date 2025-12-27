@@ -505,6 +505,45 @@ function copyPublicAssets(): Plugin {
         console.log(`[copy-public-assets] buildEnd: All public assets present, skipping fallback copy`);
       }
     },
+    closeBundle() {
+      // Final fallback - runs after all bundles are closed
+      // This ensures copy happens even if writeBundle and buildEnd didn't run
+      const publicDir = resolve(__dirname, 'public');
+      const distDir = resolve(__dirname, 'dist');
+      const iconsDir = join(distDir, 'icons');
+
+      if (!existsSync(publicDir)) {
+        return;
+      }
+
+      // Only copy if icons are still missing
+      if (!existsSync(iconsDir)) {
+        console.log(`[copy-public-assets] closeBundle: Icons missing, copying public/ directory`);
+        try {
+          const copyPublicDir = (src: string, dest: string): void => {
+            if (!existsSync(src)) {
+              return;
+            }
+            mkdirSync(dest, { recursive: true });
+            const entries = readdirSync(src, { withFileTypes: true });
+            for (const entry of entries) {
+              const srcPath = join(src, entry.name);
+              const destPath = join(dest, entry.name);
+              if (entry.isDirectory()) {
+                copyPublicDir(srcPath, destPath);
+              } else {
+                copyFileSync(srcPath, destPath);
+              }
+            }
+          };
+          copyPublicDir(publicDir, distDir);
+          console.log(`[copy-public-assets] closeBundle: ✓ Copy complete`);
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          console.warn(`[copy-public-assets] closeBundle: Error: ${errorMsg}`);
+        }
+      }
+    },
   };
 }
 
