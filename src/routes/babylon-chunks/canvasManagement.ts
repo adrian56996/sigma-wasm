@@ -113,9 +113,10 @@ export class CanvasManager {
   private baseMeshes: Map<string, Mesh> = new Map();
   private materials: Map<TileType['type'], StandardMaterial> = new Map();
   private currentRings = 1;
+  private baseRings = 1; // Fixed rings value for chunk creation (never changes)
   private wasmManager: WasmManager;
   private logFn: ((message: string, type?: 'info' | 'success' | 'warning' | 'error') => void) | null;
-  private generatePreConstraintsFn: ((constraints: LayoutConstraints, worldMap?: WorldMap, chunksToGenerate?: Array<Chunk>) => Array<{ q: number; r: number; tileType: TileType }>) | null = null;
+  private generatePreConstraintsFn: ((constraints: LayoutConstraints, worldMap?: WorldMap, chunksToGenerate?: Array<Chunk>) => Promise<Array<{ q: number; r: number; tileType: TileType }>>) | null = null;
   private worldMap: WorldMap | null = null;
   private isTestMode: boolean = false;
   private currentTileText: TextBlock | null = null;
@@ -129,7 +130,7 @@ export class CanvasManager {
   constructor(
     wasmManager: WasmManager,
     logFn?: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void,
-    generatePreConstraintsFn?: (constraints: LayoutConstraints, worldMap?: WorldMap, chunksToGenerate?: Array<Chunk>) => Array<{ q: number; r: number; tileType: TileType }>,
+    generatePreConstraintsFn?: (constraints: LayoutConstraints, worldMap?: WorldMap, chunksToGenerate?: Array<Chunk>) => Promise<Array<{ q: number; r: number; tileType: TileType }>>,
     isTestMode?: boolean
   ) {
     this.wasmManager = wasmManager;
@@ -150,7 +151,7 @@ export class CanvasManager {
   /**
    * Set the function to generate pre-constraints
    */
-  setGeneratePreConstraintsFn(fn: (constraints: LayoutConstraints, worldMap?: WorldMap, chunksToGenerate?: Array<Chunk>) => Array<{ q: number; r: number; tileType: TileType }>): void {
+  setGeneratePreConstraintsFn(fn: (constraints: LayoutConstraints, worldMap?: WorldMap, chunksToGenerate?: Array<Chunk>) => Promise<Array<{ q: number; r: number; tileType: TileType }>>): void {
     this.generatePreConstraintsFn = fn;
   }
 
@@ -170,9 +171,30 @@ export class CanvasManager {
 
   /**
    * Set current rings
+   * When setting to a new base value (not temporary), also update baseRings
+   * baseRings should only be updated for reasonable chunk sizes, not huge values from pre-constraint generation
    */
   setCurrentRings(rings: number): void {
     this.currentRings = rings;
+    // Only update baseRings if:
+    // 1. It's a reasonable chunk size (<= 20) - prevents huge values like 31, 94
+    // 2. Either baseRings is still at default (1) OR the new value isn't a huge jump
+    // This prevents baseRings from being corrupted by large requiredRings values
+    const isReasonableSize = rings <= 20;
+    const isInitialSet = this.baseRings === 1;
+    const isNotHugeJump = rings <= this.baseRings * 2;
+    
+    if (isReasonableSize && (isInitialSet || isNotHugeJump)) {
+      this.baseRings = rings;
+    }
+  }
+
+  /**
+   * Get base rings (for chunk creation - fixed value)
+   * This is the actual rings value chunks should use, not the dynamically calculated one
+   */
+  getBaseRings(): number {
+    return this.baseRings;
   }
 
   /**
@@ -666,7 +688,16 @@ export class CanvasManager {
    * @param forceRecompute - If true, recompute tile types for all existing chunks
    */
   renderGrid(constraints?: LayoutConstraints, forceRecompute?: boolean): void {
-    
+    // Start async rendering process
+    void this.renderGridAsync(constraints, forceRecompute);
+  }
+
+  /**
+   * Internal async method for rendering the WFC grid
+   * @param constraints - Optional layout constraints to use for generation
+   * @param forceRecompute - If true, recompute tile types for all existing chunks
+   */
+  private async renderGridAsync(constraints?: LayoutConstraints, forceRecompute?: boolean): Promise<void> {
     const wasmModule = this.wasmManager.getModule();
     if (!wasmModule) {
       return;
@@ -775,9 +806,10 @@ export class CanvasManager {
               }
             }
             
-            // Temporarily override rings to cover all chunks
+            // Generate constraints with expanded area for pre-constraint generation
+            // IMPORTANT: Save original rings and restore immediately after async call
+            // Chunks must always use the fixed rings value, not the dynamically calculated requiredRings
             const originalRings = this.currentRings;
-            this.currentRings = requiredRings;
             
             // Generate constraints with expanded area
             const expandedConstraints: LayoutConstraints = {
@@ -785,7 +817,11 @@ export class CanvasManager {
               rings: requiredRings,
             };
             
-            const preConstraints = this.generatePreConstraintsFn(expandedConstraints, this.worldMap, chunksNeedingGeneration);
+            const preConstraints = await this.generatePreConstraintsFn(expandedConstraints, this.worldMap, chunksNeedingGeneration);
+            
+            // CRITICAL: Restore original rings immediately after async call
+            // This prevents the changed rings value from affecting chunk creation
+            this.currentRings = originalRings;
             
             if (this.logFn) {
               if (forceRecompute) {
@@ -816,7 +852,7 @@ export class CanvasManager {
               }
             }
             
-            // Restore original rings
+            // Ensure currentRings is still the original value (should already be restored above)
             this.currentRings = originalRings;
           }
           
@@ -865,7 +901,7 @@ export class CanvasManager {
       // Original single-grid pre-constraint generation
       if (!constraints && this.generatePreConstraintsFn) {
         wasmModule.clear_pre_constraints();
-        const preConstraints = this.generatePreConstraintsFn(constraintsToUse, this.worldMap ?? undefined);
+        const preConstraints = await this.generatePreConstraintsFn(constraintsToUse, this.worldMap ?? undefined);
         for (const preConstraint of preConstraints) {
           const tileNum = tileTypeToNumber(preConstraint.tileType);
           wasmModule.set_pre_constraint(preConstraint.q, preConstraint.r, tileNum);
@@ -873,7 +909,7 @@ export class CanvasManager {
       } else if (constraints && this.generatePreConstraintsFn) {
         // If constraints are provided, still generate pre-constraints
         wasmModule.clear_pre_constraints();
-        const preConstraints = this.generatePreConstraintsFn(constraints, this.worldMap ?? undefined);
+        const preConstraints = await this.generatePreConstraintsFn(constraints, this.worldMap ?? undefined);
         for (const preConstraint of preConstraints) {
           const tileNum = tileTypeToNumber(preConstraint.tileType);
           wasmModule.set_pre_constraint(preConstraint.q, preConstraint.r, tileNum);
