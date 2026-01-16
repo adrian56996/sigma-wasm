@@ -27,7 +27,7 @@ let wasmModuleExports: {
   wasm_init: (initialCounter: number) => void;
   get_counter: () => number;
   increment_counter: () => void;
-  get_message: () => string;
+  get_country: () => string;
   set_message: (message: string) => void;
 } | null = null;
 
@@ -65,8 +65,8 @@ const getInitWasm = async (): Promise<unknown> => {
     if ('increment_counter' in moduleUnknown) {
       moduleKeys.push('increment_counter');
     }
-    if ('get_message' in moduleUnknown) {
-      moduleKeys.push('get_message');
+    if ('get_country' in moduleUnknown) {
+      moduleKeys.push('get_country');
     }
     if ('set_message' in moduleUnknown) {
       moduleKeys.push('set_message');
@@ -89,8 +89,8 @@ const getInitWasm = async (): Promise<unknown> => {
     if (!('increment_counter' in moduleUnknown) || typeof moduleUnknown.increment_counter !== 'function') {
       throw new Error(`Module missing 'increment_counter' export. Available: ${allKeys.join(', ')}`);
     }
-    if (!('get_message' in moduleUnknown) || typeof moduleUnknown.get_message !== 'function') {
-      throw new Error(`Module missing 'get_message' export. Available: ${allKeys.join(', ')}`);
+    if (!('get_country' in moduleUnknown) || typeof moduleUnknown.get_country !== 'function') {
+      throw new Error(`Module missing 'get_country' export. Available: ${allKeys.join(', ')}`);
     }
     if (!('set_message' in moduleUnknown) || typeof moduleUnknown.set_message !== 'function') {
       throw new Error(`Module missing 'set_message' export. Available: ${allKeys.join(', ')}`);
@@ -102,7 +102,7 @@ const getInitWasm = async (): Promise<unknown> => {
     const wasmInitFunc = moduleUnknown.wasm_init;
     const getCounterFunc = moduleUnknown.get_counter;
     const incrementCounterFunc = moduleUnknown.increment_counter;
-    const getMessageFunc = moduleUnknown.get_message;
+    const getMessageFunc = moduleUnknown.get_country;
     const setMessageFunc = moduleUnknown.set_message;
     
     if (typeof defaultFunc !== 'function') {
@@ -118,7 +118,7 @@ const getInitWasm = async (): Promise<unknown> => {
       throw new Error('increment_counter export is not a function');
     }
     if (typeof getMessageFunc !== 'function') {
-      throw new Error('get_message export is not a function');
+      throw new Error('get_country export is not a function');
     }
     if (typeof setMessageFunc !== 'function') {
       throw new Error('set_message export is not a function');
@@ -136,7 +136,7 @@ const getInitWasm = async (): Promise<unknown> => {
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       increment_counter: incrementCounterFunc as () => void,
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-      get_message: getMessageFunc as () => string,
+      get_country: getMessageFunc as () => string,
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       set_message: setMessageFunc as (message: string) => void,
     };
@@ -211,8 +211,8 @@ function validateHelloModule(exports: unknown): WasmModuleHello | null {
     if (typeof wasmModuleExports.increment_counter !== 'function') {
       missingExports.push('increment_counter (function)');
     }
-    if (typeof wasmModuleExports.get_message !== 'function') {
-      missingExports.push('get_message (function)');
+    if (typeof wasmModuleExports.get_country !== 'function') {
+      missingExports.push('get_country (function)');
     }
     if (typeof wasmModuleExports.set_message !== 'function') {
       missingExports.push('set_message (function)');
@@ -239,7 +239,7 @@ function validateHelloModule(exports: unknown): WasmModuleHello | null {
     wasm_init: wasmModuleExports.wasm_init,
     get_counter: wasmModuleExports.get_counter,
     increment_counter: wasmModuleExports.increment_counter,
-    get_message: wasmModuleExports.get_message,
+    get_country: wasmModuleExports.get_country,
     set_message: wasmModuleExports.set_message,
   };
 }
@@ -328,7 +328,7 @@ export const init = async (): Promise<void> => {
   // The wasm-bindgen generated code handles the marshalling between JS and WASM.
   if (WASM_HELLO.wasmModule) {
     counterDisplay.textContent = WASM_HELLO.wasmModule.get_counter().toString();
-    messageDisplay.textContent = WASM_HELLO.wasmModule.get_message();
+    messageDisplay.textContent = WASM_HELLO.wasmModule.get_coutntry();
   }
   
   // Set up event handlers
@@ -346,7 +346,7 @@ export const init = async (): Promise<void> => {
       const newMessage = messageInput.value.trim();
       if (newMessage) {
         WASM_HELLO.wasmModule.set_message(newMessage);
-        messageDisplay.textContent = WASM_HELLO.wasmModule.get_message();
+        messageDisplay.textContent = WASM_HELLO.wasmModule.get_country();
         messageInput.value = '';
       }
     }
@@ -358,7 +358,7 @@ export const init = async (): Promise<void> => {
       const newMessage = messageInput.value.trim();
       if (newMessage) {
         WASM_HELLO.wasmModule.set_message(newMessage);
-        messageDisplay.textContent = WASM_HELLO.wasmModule.get_message();
+        messageDisplay.textContent = WASM_HELLO.wasmModule.get_country();
         messageInput.value = '';
       }
     }
