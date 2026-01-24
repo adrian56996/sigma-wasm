@@ -170,4 +170,3 @@ pub fn set_fave_gum(gum: String) {
     let mut state = HELLO_STATE.lock().unwrap();
     state.set_fave_gum(gum);
 }
-
