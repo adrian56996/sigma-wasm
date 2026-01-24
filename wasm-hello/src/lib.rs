@@ -16,8 +16,8 @@ struct HelloState {
     counter: i32,
     /// Message string that can be set and retrieved
     message: String,
-    /// Gum string that can be set and retrieved
-    gum: String,
+    ///soda string that can be set and retrieved
+    soda: String,
 }
 
 impl HelloState {
@@ -26,7 +26,7 @@ impl HelloState {
         HelloState {
             counter: 0,
             message: String::from("Rust WASM is so Sigma!"),
-            gum: String::from("Hubba Bubba"),
+            soda: String::from("Hubba Bubba"),
         }
     }
     
@@ -50,14 +50,14 @@ impl HelloState {
         self.message = message;
     }
 
-    /// Get the current gum
-    fn get_fave_gum(&self) -> String {
-        self.gum.clone()
+    /// Get the current soda
+    fn get_fave_soda(&self) -> String {
+        self.soda.clone()
     }
     
-    /// Set a new gum
-    fn set_fave_gum(&mut self, gum: String) {
-        self.gum = gum;
+    /// Set a new soda
+    fn set_fave_soda(&mut self, soda: String) {
+        self.soda = soda;
     }
 }
 
@@ -144,29 +144,29 @@ pub fn set_message(message: String) {
     state.set_message(message);
 }
 
-/// Get the current gum
+/// Get the current soda
 /// 
 /// **Learning Point**: Strings in Rust need to be converted to JavaScript strings.
 /// `wasm-bindgen` handles this automatically when you return a `String` from a
 /// `#[wasm_bindgen]` function.
 /// 
-/// @returns The current gum as a JavaScript string
+/// @returns The current soda as a JavaScript string
 #[wasm_bindgen]
-pub fn get_fave_gum() -> String {
+pub fn get_fave_soda() -> String {
     let state = HELLO_STATE.lock().unwrap();
-    state.get_fave_gum()
+    state.get_fave_soda()
 }
 
-/// Set a new gum
+/// Set a new soda
 /// 
 /// **Learning Point**: JavaScript strings are automatically converted to Rust `String`
 /// when passed as parameters to `#[wasm_bindgen]` functions.
 /// 
 /// **To extend**: You could add validation, length limits, or formatting here.
 /// 
-/// @param gum - The new gum to set
+/// @param soda - The new soda to set
 #[wasm_bindgen]
-pub fn set_fave_gum(gum: String) {
+pub fn set_fave_soda(soda: String) {
     let mut state = HELLO_STATE.lock().unwrap();
-    state.set_fave_gum(gum);
+    state.set_fave_soda(soda);
 }
