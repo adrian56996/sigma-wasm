@@ -1,12 +1,12 @@
 /**
  * Hello-WASM Route Handler
- * 
+ *
  * This is a simplified template for students to learn from. It demonstrates:
  * 1. How to load a WASM module lazily
  * 2. How to manage state between TypeScript and WASM
  * 3. How to validate WASM module exports
  * 4. How to handle errors gracefully
- * 
+ *
  * **Learning Path**: Start here, then study src/routes/astar.ts for a more complex example.
  */
 
@@ -16,10 +16,10 @@ import { WasmLoadError, WasmInitError } from '../wasm/types';
 
 /**
  * Lazy WASM import - only load when init() is called
- * 
+ *
  * **Learning Point**: We use lazy imports to reduce initial bundle size.
  * The WASM module is only loaded when the user navigates to this route.
- * 
+ *
  * **To extend**: Add new function signatures here as you add them to the Rust module.
  */
 let wasmModuleExports: {
@@ -27,17 +27,17 @@ let wasmModuleExports: {
   wasm_init: (initialCounter: number) => void;
   get_counter: () => number;
   increment_counter: () => void;
-  get_country: () => string;
-  set_message: (message: string) => void;
+  get_fave_soda: () => string;
+  set_fave_soda: (soda: string) => void;
 } | null = null;
 
 /**
  * Get the WASM module initialization function
- * 
+ *
  * **Learning Point**: This function is called by loadWasmModule() helper.
- * It imports the WASM module dynamically (but not using dynamic imports - 
+ * It imports the WASM module dynamically (but not using dynamic imports -
  * the import path is static, just loaded lazily).
- * 
+ *
  * **To extend**: When you add new exports to Rust, add them to wasmModuleExports above.
  */
 const getInitWasm = async (): Promise<unknown> => {
@@ -45,12 +45,12 @@ const getInitWasm = async (): Promise<unknown> => {
     // Import only when first called - get both init and exported functions
     // Note: The path will be rewritten by vite plugin to absolute path in production
     const moduleUnknown: unknown = await import('../../pkg/wasm_hello/wasm_hello.js');
-    
+
     // Validate module has required exports
     if (typeof moduleUnknown !== 'object' || moduleUnknown === null) {
       throw new Error('Imported module is not an object');
     }
-    
+
     // Use 'in' operator checks which TypeScript can narrow
     const moduleKeys: string[] = [];
     if ('default' in moduleUnknown) {
@@ -65,16 +65,16 @@ const getInitWasm = async (): Promise<unknown> => {
     if ('increment_counter' in moduleUnknown) {
       moduleKeys.push('increment_counter');
     }
-    if ('get_country' in moduleUnknown) {
-      moduleKeys.push('get_country');
+    if ('get_fave_soda' in moduleUnknown) {
+      moduleKeys.push('get_fave_soda');
     }
-    if ('set_message' in moduleUnknown) {
-      moduleKeys.push('set_message');
+    if ('set_fave_soda' in moduleUnknown) {
+      moduleKeys.push('set_fave_soda');
     }
-    
+
     // Get all keys for error messages
     const allKeys = Object.keys(moduleUnknown);
-    
+
     // Check for required exports - these should be on the module object from wasm-bindgen
     // Use property access with 'in' checks that TypeScript can narrow
     if (!('default' in moduleUnknown) || typeof moduleUnknown.default !== 'function') {
@@ -89,22 +89,22 @@ const getInitWasm = async (): Promise<unknown> => {
     if (!('increment_counter' in moduleUnknown) || typeof moduleUnknown.increment_counter !== 'function') {
       throw new Error(`Module missing 'increment_counter' export. Available: ${allKeys.join(', ')}`);
     }
-    if (!('get_country' in moduleUnknown) || typeof moduleUnknown.get_country !== 'function') {
-      throw new Error(`Module missing 'get_country' export. Available: ${allKeys.join(', ')}`);
+    if (!('get_fave_soda' in moduleUnknown) || typeof moduleUnknown.get_fave_soda !== 'function') {
+      throw new Error(`Module missing 'get_fave_soda' export. Available: ${allKeys.join(', ')}`);
     }
-    if (!('set_message' in moduleUnknown) || typeof moduleUnknown.set_message !== 'function') {
-      throw new Error(`Module missing 'set_message' export. Available: ${allKeys.join(', ')}`);
+    if (!('set_fave_soda' in moduleUnknown) || typeof moduleUnknown.set_fave_soda !== 'function') {
+      throw new Error(`Module missing 'set_fave_soda' export. Available: ${allKeys.join(', ')}`);
     }
-    
+
     // Extract and assign functions - we've validated they exist and are functions above
     // Access properties directly after validation
     const defaultFunc = moduleUnknown.default;
     const wasmInitFunc = moduleUnknown.wasm_init;
     const getCounterFunc = moduleUnknown.get_counter;
     const incrementCounterFunc = moduleUnknown.increment_counter;
-    const getMessageFunc = moduleUnknown.get_country;
-    const setMessageFunc = moduleUnknown.set_message;
-    
+    const getFaveSodaFunc = moduleUnknown.get_fave_soda;
+    const setFaveSodaFunc = moduleUnknown.set_fave_soda;
+
     if (typeof defaultFunc !== 'function') {
       throw new Error('default export is not a function');
     }
@@ -117,13 +117,13 @@ const getInitWasm = async (): Promise<unknown> => {
     if (typeof incrementCounterFunc !== 'function') {
       throw new Error('increment_counter export is not a function');
     }
-    if (typeof getMessageFunc !== 'function') {
-      throw new Error('get_country export is not a function');
+    if (typeof getFaveSodaFunc !== 'function') {
+      throw new Error('get_fave_soda export is not a function');
     }
-    if (typeof setMessageFunc !== 'function') {
-      throw new Error('set_message export is not a function');
+    if (typeof setFaveSodaFunc !== 'function') {
+      throw new Error('set_fave_soda export is not a function');
     }
-    
+
     // TypeScript can't narrow Function to specific signatures after validation
     // Runtime validation ensures these are safe
     wasmModuleExports = {
@@ -136,25 +136,27 @@ const getInitWasm = async (): Promise<unknown> => {
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       increment_counter: incrementCounterFunc as () => void,
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-      get_country: getMessageFunc as () => string,
+      get_fave_soda: getFaveSodaFunc as () => string,
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-      set_message: setMessageFunc as (message: string) => void,
+      set_fave_soda: setFaveSodaFunc as (soda: string) => void,
     };
   }
+
   if (!wasmModuleExports) {
     throw new Error('Failed to load WASM module exports');
   }
+
   const result = wasmModuleExports.default();
   return result;
 };
 
 /**
  * Global state object for the hello-wasm module
- * 
+ *
  * **Learning Point**: This follows the same pattern as WASM_ASTAR in astar.ts.
  * We store the loaded WASM module and configuration here so it's accessible
  * throughout the route handler.
- * 
+ *
  * **To extend**: Add new state properties here as needed (e.g., UI element references).
  */
 const WASM_HELLO: WasmHello = {
@@ -164,13 +166,13 @@ const WASM_HELLO: WasmHello = {
 
 /**
  * Validate that the WASM module has all required exports
- * 
+ *
  * **Learning Point**: This function ensures type safety. We check that:
  * 1. The module has WebAssembly.Memory (required for all WASM modules)
  * 2. All expected functions are present and have the correct types
- * 
+ *
  * **To extend**: When you add new functions to Rust, add validation checks here.
- * 
+ *
  * @param exports - The exports object from the WASM module init
  * @returns The validated module or null if validation fails
  */
@@ -178,26 +180,26 @@ function validateHelloModule(exports: unknown): WasmModuleHello | null {
   if (!validateWasmModule(exports)) {
     return null;
   }
-  
+
   if (typeof exports !== 'object' || exports === null) {
     return null;
   }
-  
+
   // Check for required exports and provide detailed error info
   const getProperty = (obj: object, key: string): unknown => {
     const descriptor = Object.getOwnPropertyDescriptor(obj, key);
     return descriptor ? descriptor.value : undefined;
   };
-  
+
   const exportKeys = Object.keys(exports);
   const missingExports: string[] = [];
-  
+
   // Check for memory (required for all WASM modules)
   const memoryValue = getProperty(exports, 'memory');
   if (!memoryValue || !(memoryValue instanceof WebAssembly.Memory)) {
     missingExports.push('memory (WebAssembly.Memory)');
   }
-  
+
   // Check wasmModuleExports for functions
   if (!wasmModuleExports) {
     missingExports.push('module exports (wasmModuleExports is null)');
@@ -211,70 +213,69 @@ function validateHelloModule(exports: unknown): WasmModuleHello | null {
     if (typeof wasmModuleExports.increment_counter !== 'function') {
       missingExports.push('increment_counter (function)');
     }
-    if (typeof wasmModuleExports.get_country !== 'function') {
-      missingExports.push('get_country (function)');
+    if (typeof wasmModuleExports.get_fave_soda !== 'function') {
+      missingExports.push('get_fave_soda (function)');
     }
-    if (typeof wasmModuleExports.set_message !== 'function') {
-      missingExports.push('set_message (function)');
+    if (typeof wasmModuleExports.set_fave_soda !== 'function') {
+      missingExports.push('set_fave_soda (function)');
     }
   }
-  
+
   if (missingExports.length > 0) {
-    throw new Error(`WASM module missing required exports: ${missingExports.join(', ')}. Available exports from init result: ${exportKeys.join(', ')}`);
+    throw new Error(
+      `WASM module missing required exports: ${missingExports.join(', ')}. Available exports from init result: ${exportKeys.join(', ')}`
+    );
   }
-  
+
   // At this point we know memory exists and is WebAssembly.Memory
   const memory = memoryValue;
   if (!(memory instanceof WebAssembly.Memory)) {
     return null;
   }
-  
+
   // Construct module object from exports using type narrowing
   if (!wasmModuleExports) {
     return null;
   }
-  
+
   return {
     memory,
     wasm_init: wasmModuleExports.wasm_init,
     get_counter: wasmModuleExports.get_counter,
     increment_counter: wasmModuleExports.increment_counter,
-    get_country: wasmModuleExports.get_country,
-    set_message: wasmModuleExports.set_message,
+    get_fave_soda: wasmModuleExports.get_fave_soda,
+    set_fave_soda: wasmModuleExports.set_fave_soda,
   };
 }
 
 /**
  * Initialize the hello-wasm route
- * 
+ *
  * **Learning Point**: This function is called by the router when the user navigates
  * to /hello-wasm. It:
  * 1. Loads the WASM module
  * 2. Validates the exports
  * 3. Initializes the module
  * 4. Sets up UI event handlers
- * 
+ *
  * **To extend**: Add UI initialization, event listeners, or other setup logic here.
  */
 export const init = async (): Promise<void> => {
   // Get error element for displaying errors
   const errorEl = document.getElementById('error');
-  
+
   // Initialize WASM module using loadWasmModule helper
   // **Learning Point**: loadWasmModule handles the complexity of loading and
   // validating WASM modules. It's a reusable utility used throughout the project.
   try {
-    const wasmModule = await loadWasmModule<WasmModuleHello>(
-      getInitWasm,
-      validateHelloModule
-    );
-    
+    const wasmModule = await loadWasmModule<WasmModuleHello>(getInitWasm, validateHelloModule);
+
     if (!wasmModule) {
       throw new WasmInitError('WASM module failed validation');
     }
-    
+
     WASM_HELLO.wasmModule = wasmModule;
-    
+
     // Initialize the module with starting counter value of 0
     wasmModule.wasm_init(0);
   } catch (error) {
@@ -291,11 +292,12 @@ export const init = async (): Promise<void> => {
           errorEl.textContent += `\n\nStack: ${error.stack}`;
         }
         if ('cause' in error && error.cause) {
-          const causeMsg = error.cause instanceof Error 
-            ? error.cause.message 
-            : typeof error.cause === 'string' 
-              ? error.cause 
-              : JSON.stringify(error.cause);
+          const causeMsg =
+            error.cause instanceof Error
+              ? error.cause.message
+              : typeof error.cause === 'string'
+                ? error.cause
+                : JSON.stringify(error.cause);
           errorEl.textContent += `\n\nCause: ${causeMsg}`;
         }
       } else {
@@ -304,33 +306,32 @@ export const init = async (): Promise<void> => {
     }
     throw error;
   }
-  
+
   // Get UI elements
   const counterDisplay = document.getElementById('counter-display');
-  const messageDisplay = document.getElementById('message-display');
+  const faveSodaDisplay = document.getElementById('fave-soda-display');
   const incrementBtn = document.getElementById('increment-btn');
-  const messageInputEl = document.getElementById('message-input');
-  const setMessageBtn = document.getElementById('set-message-btn');
-  
-  if (!counterDisplay || !messageDisplay || !incrementBtn || !messageInputEl || !setMessageBtn) {
+  const faveSodaInputEl = document.getElementById('fave-soda-input');
+  const setFaveSodaBtn = document.getElementById('set-fave-soda-btn');
+
+  if (!counterDisplay || !incrementBtn || !faveSodaDisplay || !faveSodaInputEl || !setFaveSodaBtn) {
     throw new Error('Required UI elements not found');
   }
-  
+
   // Type narrowing for input element
-  if (!(messageInputEl instanceof HTMLInputElement)) {
-    throw new Error('message-input element is not an HTMLInputElement');
+  if (!(faveSodaInputEl instanceof HTMLInputElement)) {
+    throw new Error('fave-soda-input element is not an HTMLInputElement');
   }
-  
-  const messageInput = messageInputEl;
-  
+  const faveSodaInput = faveSodaInputEl;
+
   // Update display with initial values
   // **Learning Point**: We call WASM functions directly from TypeScript.
   // The wasm-bindgen generated code handles the marshalling between JS and WASM.
   if (WASM_HELLO.wasmModule) {
     counterDisplay.textContent = WASM_HELLO.wasmModule.get_counter().toString();
-    messageDisplay.textContent = WASM_HELLO.wasmModule.get_coutntry();
+    faveSodaDisplay.textContent = WASM_HELLO.wasmModule.get_fave_soda();
   }
-  
+
   // Set up event handlers
   // **Learning Point**: This demonstrates how to call WASM functions in response
   // to user interactions. The state is managed in Rust, but we update the UI in TypeScript.
@@ -340,28 +341,27 @@ export const init = async (): Promise<void> => {
       counterDisplay.textContent = WASM_HELLO.wasmModule.get_counter().toString();
     }
   });
-  
-  setMessageBtn.addEventListener('click', () => {
-    if (WASM_HELLO.wasmModule && messageInput) {
-      const newMessage = messageInput.value.trim();
-      if (newMessage) {
-        WASM_HELLO.wasmModule.set_message(newMessage);
-        messageDisplay.textContent = WASM_HELLO.wasmModule.get_country();
-        messageInput.value = '';
+
+  setFaveSodaBtn.addEventListener('click', () => {
+    if (WASM_HELLO.wasmModule && faveSodaInput) {
+      const newSoda = faveSodaInput.value.trim();
+      if (newSoda) {
+        WASM_HELLO.wasmModule.set_fave_soda(newSoda);
+        faveSodaDisplay.textContent = WASM_HELLO.wasmModule.get_fave_soda();
+        faveSodaInput.value = '';
       }
     }
   });
-  
-  // Allow Enter key to set message
-  messageInput.addEventListener('keydown', (e: KeyboardEvent) => {
+
+  // Allow Enter key to set fave soda
+  faveSodaInput.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Enter' && WASM_HELLO.wasmModule) {
-      const newMessage = messageInput.value.trim();
-      if (newMessage) {
-        WASM_HELLO.wasmModule.set_message(newMessage);
-        messageDisplay.textContent = WASM_HELLO.wasmModule.get_country();
-        messageInput.value = '';
+      const newSoda = faveSodaInput.value.trim();
+      if (newSoda) {
+        WASM_HELLO.wasmModule.set_fave_soda(newSoda);
+        faveSodaDisplay.textContent = WASM_HELLO.wasmModule.get_fave_soda();
+        faveSodaInput.value = '';
       }
     }
   });
 };
-
