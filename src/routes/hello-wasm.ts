@@ -26,7 +26,9 @@ let wasmModuleExports: {
   default: () => unknown;
   wasm_init: (initialCounter: number) => void;
   get_counter: () => number;
-  increment_counter: () => void;
+  increment_counter: () => string;
+  get_message: () => string;
+  set_message: (message: string) => void;
   get_fave_soda: () => string;
   set_fave_soda: (soda: string) => void;
 } | null = null;
@@ -65,13 +67,19 @@ const getInitWasm = async (): Promise<unknown> => {
     if ('increment_counter' in moduleUnknown) {
       moduleKeys.push('increment_counter');
     }
+    if ('get_message' in moduleUnknown) {
+      moduleKeys.push('get_message');
+    }
+    if ('set_message' in moduleUnknown) {
+      moduleKeys.push('set_message');
+    }
     if ('get_fave_soda' in moduleUnknown) {
       moduleKeys.push('get_fave_soda');
     }
     if ('set_fave_soda' in moduleUnknown) {
       moduleKeys.push('set_fave_soda');
     }
-
+    
     // Get all keys for error messages
     const allKeys = Object.keys(moduleUnknown);
 
