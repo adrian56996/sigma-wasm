@@ -31,7 +31,7 @@ WORKDIR /app
 # Copy workspace Cargo.toml and member Cargo.toml files for dependency caching
 # **Learning Point**: Add new WASM crate Cargo.toml files here for Docker build caching.
 # This allows Docker to cache dependencies separately from source code changes.
-COPY Cargo.toml ./
+COPY Cargo.toml Cargo.lock ./
 COPY wasm-astar/Cargo.toml ./wasm-astar/
 COPY wasm-preprocess/Cargo.toml ./wasm-preprocess/
 COPY wasm-preprocess-256m/Cargo.toml ./wasm-preprocess-256m/
